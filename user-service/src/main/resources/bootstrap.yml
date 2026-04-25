@@ -1,0 +1,16 @@
+server:
+  port: 8100
+spring:
+  application:
+    name: user-service
+  cloud:
+    consul:
+      host: localhost
+      port: 8500
+      config:
+        enabled: true
+        format: YAML
+        prefixes:
+        - config
+        data-key: data
+
