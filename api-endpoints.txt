@@ -1,154 +1,397 @@
-===============================================
-  ZOMATO API ENDPOINTS - TEST REFERENCE
-===============================================
-  Base URL: http://localhost:8080
-  Follow the order below (IDs depend on previous calls)
-===============================================
+================================================================
+ZOMATO MICROSERVICES — API ENDPOINTS REFERENCE
+================================================================
+
+Architecture: 6 microservices + API Gateway + Consul + MySQL + Redis
+All services register with Consul (port 8500)
+All Feign calls discover services via Consul
+
+================================================================
+SERVICE PORTS
+================================================================
+
+Service              Direct Port   Via Gateway (8080)
+------------------   -----------   -----------------------
+api-gateway              8080      —
+user-service             8100      http://localhost:8080
+restaurant-service       8200      http://localhost:8080
+delivery-service         8300      http://localhost:8080
+order-service            8400      http://localhost:8080
+payment-service          8550      http://localhost:8080
+review-service           8600      http://localhost:8080
+
+INFRASTRUCTURE:
+- Consul (service discovery + KV config): http://localhost:8500
+- MySQL: localhost:3306 (separate DB per service)
+- Redis: localhost:6379 (delivery-service uses for geo)
 
 
---- 1. USER ---
+================================================================
+PRE-REQUISITE CHECKS
+================================================================
 
-[POST] /api/users
-Register a new user
+# Verify Consul running
+docker ps | grep consul
 
-Body:
-{
-  "name": "Kaustubh",
-  "email": "kaustubh@test.com",
-  "phone": "9876543210",
-  "password": "pass123"
-}
+# Verify all services registered
+curl http://localhost:8500/v1/catalog/services
 
-[GET] /api/users/{id}
-Get user by ID
+# Verify Redis (for delivery-service)
+docker ps | grep redis
 
-Example: GET /api/users/1
-
-
---- 2. RESTAURANT ---
-
-[POST] /api/restaurants
-Add a new restaurant
-
-Body:
-{
-  "name": "Pizza Palace",
-  "address": "MG Road, Bangalore",
-  "cuisine": "Italian",
-  "operatingHours": "10:00 AM - 11:00 PM"
-}
-
-[GET] /api/restaurants
-Get all restaurants
-
-[GET] /api/restaurants/{id}/menu
-Get menu of a restaurant
-
-Example: GET /api/restaurants/1/menu
+# All services should be running:
+cd user-service && mvn spring-boot:run        # terminal 1
+cd restaurant-service && mvn spring-boot:run  # terminal 2
+cd delivery-service && mvn spring-boot:run    # terminal 3
+cd order-service && mvn spring-boot:run       # terminal 4
+cd payment-service && mvn spring-boot:run     # terminal 5
+cd review-service && mvn spring-boot:run      # terminal 6
+cd api-gateway && mvn spring-boot:run         # terminal 7
 
 
---- 3. MENU ITEM ---
+================================================================
+1. USER SERVICE (port 8100)
+================================================================
 
-[POST] /api/menu-items
-Add a menu item to a restaurant
+# CREATE USER
+curl -X POST http://localhost:8100/api/users \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Kaustubh",
+    "email": "kaustubh@test.com",
+    "phone": "9999999999",
+    "password": "test123"
+  }'
 
-Body:
-{
-  "itemName": "Margherita Pizza",
-  "description": "Classic cheese pizza with fresh basil",
-  "price": 299.00,
-  "category": "Pizza",
-  "restaurantId": 1
-}
+Response: {"id":1, "name":"Kaustubh", ...}
 
-Body (another item):
-{
-  "itemName": "Garlic Bread",
-  "description": "Crispy garlic bread with herbs",
-  "price": 149.00,
-  "category": "Starters",
-  "restaurantId": 1
-}
+# GET USER BY ID
+curl http://localhost:8100/api/users/1
+
+Response: {"id":1, "name":"Kaustubh", "email":"...", "phone":"...", "addresses":[]}
 
 
---- 4. ORDER ---
+================================================================
+2. RESTAURANT SERVICE (port 8200)
+================================================================
 
-[POST] /api/orders
-Place an order
+# CREATE RESTAURANT (with location for delivery partner assignment)
+curl -X POST http://localhost:8200/api/restaurants \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Pizza Hut",
+    "address": "MG Road",
+    "cuisine": "Italian",
+    "operatingHours": "10AM-11PM",
+    "location": {
+      "latitude": 28.6139,
+      "longitude": 77.2090
+    }
+  }'
 
-Body:
-{
+Response: {"id":1, "name":"Pizza Hut", ..., "location":{"latitude":28.6139,"longitude":77.2090}}
+
+# GET ALL RESTAURANTS
+curl http://localhost:8200/api/restaurants
+
+# GET RESTAURANT BY ID (used by Feign from order-service, review-service)
+curl http://localhost:8200/api/restaurants/1
+
+# GET RESTAURANT MENU
+curl http://localhost:8200/api/restaurants/1/menu
+
+# CREATE MENU ITEM
+curl -X POST http://localhost:8200/api/menu-items \
+  -H "Content-Type: application/json" \
+  -d '{
+    "itemName": "Margherita",
+    "description": "Classic cheese pizza",
+    "price": 250,
+    "category": "Pizza",
+    "restaurantId": 1
+  }'
+
+Response: {"id":1, "itemName":"Margherita", "price":250, "restaurantId":1}
+
+# GET MENU ITEM BY ID (used by Feign from order-service)
+curl http://localhost:8200/api/menu-items/1
+
+
+================================================================
+3. DELIVERY SERVICE (port 8300) — Redis + WebSocket
+================================================================
+
+# CREATE DELIVERY PARTNER
+curl -X POST http://localhost:8300/api/delivery-partners \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Ramesh",
+    "phone": "9876543210",
+    "vehicleType": "BIKE"
+  }'
+
+Response: {"id":1, "name":"Ramesh", "availabilityStatus":"AVAILABLE"}
+
+# GET DELIVERY PARTNER BY ID
+curl http://localhost:8300/api/delivery-partners/1
+
+# MARK AVAILABLE (Redis SET)
+curl -X PUT http://localhost:8300/api/delivery-partners/1/available
+
+# MARK UNAVAILABLE
+curl -X PUT http://localhost:8300/api/delivery-partners/1/unavailable
+
+# UPDATE LOCATION (Redis GEO + WebSocket broadcast to /topic/location/{id})
+curl -X PUT http://localhost:8300/api/delivery-partners/1/location \
+  -H "Content-Type: application/json" \
+  -d '{
+    "latitude": 28.6140,
+    "longitude": 77.2091
+  }'
+
+Response: "location updated!"
+
+# GET PARTNER LOCATION
+curl http://localhost:8300/api/delivery-partners/1/location
+
+Response: {"longitude":..., "latitude":...}
+
+# FIND NEAREST AVAILABLE PARTNERS (used by Feign from order-service)
+curl "http://localhost:8300/api/delivery-partners/nearest?latitude=28.6139&longitude=77.2090&radiusKm=5"
+
+Response: [1]   (list of partner IDs sorted by distance)
+
+
+================================================================
+4. ORDER SERVICE (port 8400) — Uses 3 Feign clients
+================================================================
+
+# PLACE ORDER (orchestrates 3 services via Feign)
+# Feign chain:
+#  1. UserServiceClient.getUser() -> verify user
+#  2. RestaurantServiceClient.getRestaurant() -> get restaurant + location
+#  3. RestaurantServiceClient.getMenuItem() -> for each item, get details (price snapshot)
+#  4. DeliveryServiceClient.getAvailablePartner() -> find nearest
+#  5. DeliveryServiceClient.markUnavailable() -> mark assigned partner busy
+
+curl -X POST http://localhost:8400/api/orders \
+  -H "Content-Type: application/json" \
+  -d '{
+    "userId": 1,
+    "restaurantId": 1,
+    "items": [
+      {"menuItemId": 1, "quantity": 2}
+    ]
+  }'
+
+Response: {
+  "id": 1,
   "userId": 1,
   "restaurantId": 1,
+  "restaurantName": "Pizza Hut",
+  "deliveryPartnerId": 1,
+  "status": "PLACED",
+  "totalAmount": 500.00,
   "items": [
-    {
-      "menuItemId": 1,
-      "quantity": 2
-    },
-    {
-      "menuItemId": 2,
-      "quantity": 1
-    }
+    {"id":1, "menuItemId":1, "itemName":"Margherita", "price":250, "quantity":2}
   ]
 }
 
-[GET] /api/orders/{id}
-Get order by ID
+# GET ORDER BY ID (used by Feign from payment-service)
+curl http://localhost:8400/api/orders/1
 
-Example: GET /api/orders/1
-
-[GET] /api/orders/user/{userId}
-Get all orders of a user
-
-Example: GET /api/orders/user/1
+# GET ALL ORDERS BY USER
+curl http://localhost:8400/api/orders/user/1
 
 
---- 5. DELIVERY PARTNER ---
+================================================================
+5. PAYMENT SERVICE (port 8550) — Uses 1 Feign client
+================================================================
 
-[POST] /api/delivery-partners
-Register a delivery partner
+# RECORD PAYMENT (Feign: OrderServiceClient.getOrderById -> verify + get totalAmount)
+curl -X POST http://localhost:8550/api/payments \
+  -H "Content-Type: application/json" \
+  -d '{
+    "orderId": 1,
+    "paymentMethod": "UPI"
+  }'
 
-Body:
-{
-  "name": "Rahul Kumar",
-  "phone": "9988776655",
-  "vehicleType": "Bike"
-}
+# Payment methods: UPI, CREDIT_CARD, DEBIT_CARD, NET_BANKING, CASH_ON_DELIVERY
 
-
---- 6. PAYMENT ---
-
-[POST] /api/payments
-Record a payment for an order
-
-Body:
-{
+Response: {
+  "id": 1,
   "orderId": 1,
-  "paymentMethod": "UPI"
+  "paymentMethod": "UPI",
+  "amount": 500.00,           # Auto-fetched from order via Feign
+  "paymentStatus": "COMPLETED",
+  "paymentTime": "..."
 }
 
+# Duplicate payment for same order returns 400 error
 
---- 7. REVIEW ---
+# GET PAYMENT BY ORDER ID
+curl http://localhost:8550/api/payments/order/1
 
-[POST] /api/reviews
-Add a review for a restaurant
 
-Body:
-{
+================================================================
+6. REVIEW SERVICE (port 8600) — Uses 2 Feign clients
+================================================================
+
+# ADD REVIEW (Feign chain)
+#  1. UserServiceClient.getUserById -> verify user + get userName for snapshot
+#  2. RestaurantServiceClient.getRestaurant -> verify restaurant
+curl -X POST http://localhost:8600/api/reviews \
+  -H "Content-Type: application/json" \
+  -d '{
+    "userId": 1,
+    "restaurantId": 1,
+    "rating": 4.5,
+    "comment": "Great pizza!"
+  }'
+
+# Rating: 1.0 to 5.0
+
+Response: {
+  "id": 1,
   "userId": 1,
+  "userName": "Kaustubh",     # Snapshot from user-service via Feign
   "restaurantId": 1,
   "rating": 4.5,
-  "comment": "Great pizza, fast delivery!"
+  "comment": "Great pizza!",
+  "reviewDate": "..."
 }
 
+# GET ALL REVIEWS FOR A RESTAURANT
+curl http://localhost:8600/api/reviews/restaurant/1
 
-===============================================
-  TESTING ORDER (recommended):
-  1. Create User
-  2. Create Restaurant
-  3. Add Menu Items to Restaurant
-  4. Place Order
-  5. Register Delivery Partner
-  6. Record Payment
-  7. Add Review
-===============================================
+
+================================================================
+7. API GATEWAY (port 8080) — Single entry point
+================================================================
+
+All above endpoints work through gateway too — replace direct ports with 8080.
+
+GATEWAY ROUTING TABLE:
+  /api/users/**            -> user-service
+  /api/restaurants/**      -> restaurant-service
+  /api/menu-items/**       -> restaurant-service
+  /api/delivery-partners/* -> delivery-service
+  /api/orders/**           -> order-service
+  /api/payments/**         -> payment-service
+  /api/reviews/**          -> review-service
+
+Example via gateway:
+curl -X POST http://localhost:8080/api/orders -H "Content-Type: application/json" \
+  -d '{"userId":1,"restaurantId":1,"items":[{"menuItemId":1,"quantity":2}]}'
+
+
+================================================================
+COMPLETE END-TO-END FLOW TEST (sequential — copy paste)
+================================================================
+
+# 1. Create user
+curl -X POST http://localhost:8080/api/users -H "Content-Type: application/json" \
+  -d '{"name":"Kaustubh","email":"k@test.com","phone":"9999999999","password":"test"}'
+
+# 2. Create restaurant with location
+curl -X POST http://localhost:8080/api/restaurants -H "Content-Type: application/json" \
+  -d '{"name":"Pizza Hut","address":"MG","cuisine":"Italian","operatingHours":"10AM-11PM","location":{"latitude":28.6139,"longitude":77.2090}}'
+
+# 3. Add menu item
+curl -X POST http://localhost:8080/api/menu-items -H "Content-Type: application/json" \
+  -d '{"itemName":"Margherita","description":"Classic","price":250,"category":"Pizza","restaurantId":1}'
+
+# 4. Create delivery partner
+curl -X POST http://localhost:8080/api/delivery-partners -H "Content-Type: application/json" \
+  -d '{"name":"Ramesh","phone":"9876543210","vehicleType":"BIKE"}'
+
+# 5. Set partner location
+curl -X PUT http://localhost:8080/api/delivery-partners/1/location -H "Content-Type: application/json" \
+  -d '{"latitude":28.6140,"longitude":77.2091}'
+
+# 6. Mark partner available
+curl -X PUT http://localhost:8080/api/delivery-partners/1/available
+
+# 7. Place order — full Feign chain executes
+curl -X POST http://localhost:8080/api/orders -H "Content-Type: application/json" \
+  -d '{"userId":1,"restaurantId":1,"items":[{"menuItemId":1,"quantity":2}]}'
+
+# 8. Record payment
+curl -X POST http://localhost:8080/api/payments -H "Content-Type: application/json" \
+  -d '{"orderId":1,"paymentMethod":"UPI"}'
+
+# 9. Add review
+curl -X POST http://localhost:8080/api/reviews -H "Content-Type: application/json" \
+  -d '{"userId":1,"restaurantId":1,"rating":4.5,"comment":"Great!"}'
+
+
+================================================================
+TEST RESULTS (verified working — 2026-04-30)
+================================================================
+
+[OK] User create + get by ID
+[OK] Restaurant create + get all + get by ID + menu
+[OK] Menu item create + get by ID
+[OK] Delivery partner create + get + availability + location + nearest
+[OK] Order place — full Feign chain works (user, restaurant, menu, partner)
+[OK] Order returns deliveryPartnerId when partner nearby + available
+[OK] Payment record — amount auto-fetched from order via Feign
+[OK] Payment duplicate prevention works (400 error)
+[OK] Review add — userName snapshot from user-service via Feign
+[OK] Review get by restaurant
+[OK] All services register in Consul
+[OK] Bootstrap.yml + Consul Config working (DB URLs from KV)
+
+
+================================================================
+KNOWN BUGS / TODO
+================================================================
+
+1. RESTAURANT LOCATION FIX (2026-04-30):
+   RestaurantRequest didn't have location field — was getting dropped.
+   FIXED — added LocationRequest DTO + field in RestaurantRequest.
+   ACTION: Restart restaurant-service to pick up the fix.
+
+2. Delivery partner location response has lat/long swapped in GET endpoint
+   (carried from monolith bug). Redis stores correctly, only response display.
+   File: DeliveryPartnerController.getLocation()
+   Fix: change new Location(coordinates.getY(), coordinates.getX())
+        to    new Location(coordinates.getX(), coordinates.getY())
+
+3. Restaurant rating update on review — currently NOT cross-service
+   (TODO marked in ReviewService.java).
+   Phase 3 me Kafka event-driven implement karenge.
+
+
+================================================================
+CONSUL KV ENTRIES (centralized config)
+================================================================
+
+config/application/data           -> common (DB credentials, JPA settings)
+config/user-service/data          -> user-service DB URL
+config/restaurant-service/data    -> restaurant-service DB URL
+config/delivery-service/data      -> delivery-service DB URL + Redis config
+config/order-service/data         -> order-service DB URL
+config/payment-service/data       -> payment-service DB URL
+config/review-service/data        -> review-service DB URL
+
+
+================================================================
+PROGRESS
+================================================================
+
+PHASE 1 — Microservices split: COMPLETE ✓
+  - 6 microservices ✓
+  - API Gateway ✓
+  - Consul service discovery + KV config ✓
+  - OpenFeign inter-service calls ✓
+  - Database per service ✓
+  - Redis (delivery geo) ✓
+  - WebSocket (delivery location updates) ✓
+
+NEXT PHASES:
+  PHASE 2 — Swagger/OpenAPI documentation
+  PHASE 3 — Kafka events + WebClient (some calls)
+  PHASE 4 — Docker + docker-compose
+
+================================================================

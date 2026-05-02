@@ -19,9 +19,9 @@
     <!-- 2. This module's identity                    -->
     <!-- (groupId + version inherited from parent)    -->
     <!-- ============================================ -->
-    <artifactId>user-service</artifactId>
-    <name>User Service</name>
-    <description>Manages users and addresses</description>
+    <artifactId>order-service</artifactId>
+    <name>Order Service</name>
+    <description>Manages orders with Feign-based inter-service communication</description>
 
     <!-- ============================================ -->
     <!-- 3. Service-specific dependencies             -->
@@ -45,7 +45,7 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-jpa</artifactId>
         </dependency>
-        <!-- SWAGGER / OPENAPI: auto-generates docs + interactive UI -->
+<!-- SWAGGER / OPENAPI: auto-generates docs + interactive UI -->
 <dependency>
     <groupId>org.springdoc</groupId>
     <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
@@ -69,6 +69,17 @@
             <groupId>org.modelmapper</groupId>
             <artifactId>modelmapper</artifactId>
             <version>${modelmapper.version}</version>
+        </dependency>
+        <!-- OPENFEIGN: declarative HTTP client -->
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-openfeign</artifactId>
+        </dependency>
+
+        <!-- LOAD BALANCER: required by Feign with Consul discovery -->
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-loadbalancer</artifactId>
         </dependency>
 
     </dependencies>

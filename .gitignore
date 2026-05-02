@@ -41,3 +41,7 @@ application-local.properties
 application-secret.properties
 
 api-endpoint.txt
+docker-cheatsheet.md
+notes.txt
+interview-notes.txt
+explained/

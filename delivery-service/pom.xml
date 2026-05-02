@@ -19,8 +19,8 @@
     <!-- 2. This module's identity                    -->
     <!-- (groupId + version inherited from parent)    -->
     <!-- ============================================ -->
-    <artifactId>user-service</artifactId>
-    <name>User Service</name>
+    <artifactId>delivery-service</artifactId>
+    <name>Delivery Service</name>
     <description>Manages users and addresses</description>
 
     <!-- ============================================ -->
@@ -45,12 +45,7 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-jpa</artifactId>
         </dependency>
-        <!-- SWAGGER / OPENAPI: auto-generates docs + interactive UI -->
-<dependency>
-    <groupId>org.springdoc</groupId>
-    <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
-    <version>2.5.0</version>
-</dependency>
+
         <!-- DB DRIVER: MySQL (runtime only — code time pe nahi chahiye) -->
         <dependency>
             <groupId>com.mysql</groupId>
@@ -63,13 +58,29 @@
             <groupId>org.springframework.cloud</groupId>
             <artifactId>spring-cloud-starter-consul-discovery</artifactId>
         </dependency>
-
+<!-- SWAGGER / OPENAPI: auto-generates docs + interactive UI -->
+<dependency>
+    <groupId>org.springdoc</groupId>
+    <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+    <version>2.5.0</version>
+</dependency>
         <!-- MAPPER: DTO <-> Entity conversion -->
         <dependency>
             <groupId>org.modelmapper</groupId>
             <artifactId>modelmapper</artifactId>
             <version>${modelmapper.version}</version>
         </dependency>
+<!-- REDIS: for delivery partner geo-location -->
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-data-redis</artifactId>
+</dependency>
+
+<!-- WEBSOCKET: real-time location updates -->
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-websocket</artifactId>
+</dependency>
 
     </dependencies>
 

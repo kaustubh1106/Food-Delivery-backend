@@ -1,0 +1,15 @@
+server:
+  port: 8600
+spring:
+  application:
+    name: review-service
+  cloud:
+    consul:
+      host: localhost
+      port: 8500
+      config:
+        enabled: true
+        format: YAML
+        prefixes:
+          - config
+        data-key: data

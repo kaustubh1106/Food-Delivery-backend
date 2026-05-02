@@ -1,0 +1,16 @@
+server:
+  port: 8300
+spring:
+  application:
+    name: delivery-service
+  cloud:
+    consul:
+      host: localhost
+      port: 8500
+      config:
+        enabled: true
+        format: YAML
+        prefixes:
+        - config
+        data-key: data
+

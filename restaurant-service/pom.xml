@@ -19,8 +19,8 @@
     <!-- 2. This module's identity                    -->
     <!-- (groupId + version inherited from parent)    -->
     <!-- ============================================ -->
-    <artifactId>user-service</artifactId>
-    <name>User Service</name>
+    <artifactId>restaurant-service</artifactId>
+    <name>Restaurant Service</name>
     <description>Manages users and addresses</description>
 
     <!-- ============================================ -->
@@ -45,19 +45,19 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-jpa</artifactId>
         </dependency>
-        <!-- SWAGGER / OPENAPI: auto-generates docs + interactive UI -->
-<dependency>
-    <groupId>org.springdoc</groupId>
-    <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
-    <version>2.5.0</version>
-</dependency>
+
         <!-- DB DRIVER: MySQL (runtime only — code time pe nahi chahiye) -->
         <dependency>
             <groupId>com.mysql</groupId>
             <artifactId>mysql-connector-j</artifactId>
             <scope>runtime</scope>
         </dependency>
-
+<!-- SWAGGER / OPENAPI: auto-generates docs + interactive UI -->
+<dependency>
+    <groupId>org.springdoc</groupId>
+    <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+    <version>2.5.0</version>
+</dependency>
         <!-- SERVICE DISCOVERY: Consul registration -->
         <dependency>
             <groupId>org.springframework.cloud</groupId>
