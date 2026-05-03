@@ -1,0 +1,6 @@
+CREATE DATABASE IF NOT EXISTS zomato_user_db;
+CREATE DATABASE IF NOT EXISTS zomato_restaurant_db;
+CREATE DATABASE IF NOT EXISTS zomato_delivery_db;
+CREATE DATABASE IF NOT EXISTS zomato_order_db;
+CREATE DATABASE IF NOT EXISTS zomato_payment_db;
+CREATE DATABASE IF NOT EXISTS zomato_review_db;

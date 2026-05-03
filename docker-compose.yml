@@ -1,0 +1,165 @@
+version: '3.8'
+
+services:
+
+  mysql:
+    image: mysql:8.0
+    container_name: zomato-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_USER: zomato
+      MYSQL_PASSWORD: zomato123
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - zomato-network
+
+  consul:
+    image: consul:1.15
+    container_name: zomato-consul
+    ports:
+      - "8500:8500"
+    command: agent -server -bootstrap-expect=1 -ui -client=0.0.0.0
+    healthcheck:
+      test: ["CMD", "consul", "members"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - zomato-network
+
+  user-service:
+    build: ./user-service
+    container_name: user-service
+    environment:
+      CONSUL_HOST: consul
+      DB_URL: jdbc:mysql://mysql:3306/zomato_user_db?createDatabaseIfNotExist=true
+      DB_USER: root
+      DB_PASSWORD: root
+    ports:
+      - "8100:8100"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      consul:
+        condition: service_healthy
+    networks:
+      - zomato-network
+
+  restaurant-service:
+    build: ./restaurant-service
+    container_name: restaurant-service
+    environment:
+      CONSUL_HOST: consul
+      DB_URL: jdbc:mysql://mysql:3306/zomato_restaurant_db?createDatabaseIfNotExist=true
+      DB_USER: root
+      DB_PASSWORD: root
+    ports:
+      - "8200:8200"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      consul:
+        condition: service_healthy
+    networks:
+      - zomato-network
+
+  delivery-service:
+    build: ./delivery-service
+    container_name: delivery-service
+    environment:
+      CONSUL_HOST: consul
+      DB_URL: jdbc:mysql://mysql:3306/zomato_delivery_db?createDatabaseIfNotExist=true
+      DB_USER: root
+      DB_PASSWORD: root
+    ports:
+      - "8300:8300"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      consul:
+        condition: service_healthy
+    networks:
+      - zomato-network
+
+  order-service:
+    build: ./order-service
+    container_name: order-service
+    environment:
+      CONSUL_HOST: consul
+      DB_URL: jdbc:mysql://mysql:3306/zomato_order_db?createDatabaseIfNotExist=true
+      DB_USER: root
+      DB_PASSWORD: root
+    ports:
+      - "8400:8400"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      consul:
+        condition: service_healthy
+    networks:
+      - zomato-network
+
+  payment-service:
+    build: ./payment-service
+    container_name: payment-service
+    environment:
+      CONSUL_HOST: consul
+      DB_URL: jdbc:mysql://mysql:3306/zomato_payment_db?createDatabaseIfNotExist=true
+      DB_USER: root
+      DB_PASSWORD: root
+    ports:
+      - "8550:8550"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      consul:
+        condition: service_healthy
+    networks:
+      - zomato-network
+
+  review-service:
+    build: ./review-service
+    container_name: review-service
+    environment:
+      CONSUL_HOST: consul
+      DB_URL: jdbc:mysql://mysql:3306/zomato_review_db?createDatabaseIfNotExist=true
+      DB_USER: root
+      DB_PASSWORD: root
+    ports:
+      - "8600:8600"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      consul:
+        condition: service_healthy
+    networks:
+      - zomato-network
+
+  api-gateway:
+    build: ./api-gateway
+    container_name: api-gateway
+    environment:
+      CONSUL_HOST: consul
+    ports:
+      - "8080:8080"
+    depends_on:
+      consul:
+        condition: service_healthy
+    networks:
+      - zomato-network
+
+volumes:
+  mysql-data:
+
+networks:
+  zomato-network:
+    driver: bridge

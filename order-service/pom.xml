@@ -58,6 +58,7 @@
             <scope>runtime</scope>
         </dependency>
 
+
         <!-- SERVICE DISCOVERY: Consul registration -->
         <dependency>
             <groupId>org.springframework.cloud</groupId>
